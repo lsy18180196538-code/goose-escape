@@ -27,7 +27,15 @@ body {
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// ══════════════════════════════════════════════════════════════
+// ── 精灵图片加载 ──────────────────────────────────────────────
+const IMG = {};
+const BASE = 'https://lsy18180196538-code.github.io/goose-escape/';
+['penguin','pharaoh'].forEach(name=>{
+  const img = new Image();
+  img.src = BASE + name + '.png';
+  IMG[name] = img;
+});
+
 // 背景音乐系统 v2 — 流行电子风 EDM，BPM 随速度 120→200+
 // 层次：kick底鼓 + 合成bass + 明亮铅音旋律 + 打击乐 + 钢琴感和弦
 // ══════════════════════════════════════════════════════════════
@@ -2050,194 +2058,32 @@ function drawObsExtra(o){
 // ── DRAW DEMON PENGUIN CHASER (恶魔企鹅追捕者) ──────────────
 function drawPharaoh() {
   if(state !== ST.PLAY && state !== ST.DEAD) return;
-
   const closeness = 1 - Math.min(1, pharaoh.dist / 420);
   if(closeness < 0.02) return;
-
-  // 玩家屏幕坐标
-  const pp = proj(P.x, P.y, P.z);
-  if(!pp) return;
-
-  // 追击者画在玩家正后方（屏幕下方），固定偏移，不随closeness变化以免遮挡
+  const pp = proj(P.x, P.y, P.z); if(!pp) return;
   const chaserX = pp.x;
-  const chaserY = pp.y + 130;  // 玩家脚底下方130px，追击者明显在身后
-  const s       = pp.s * 0.5 * (0.85 + closeness * 0.3);
-  const alpha   = 0.35 + closeness * 0.65;
-  const t       = pharaoh.animT;
-  const danger  = pharaoh.dist < 150 ? 1 - pharaoh.dist / 150 : 0;
-  const pulse   = 0.5 + Math.sin(pharaoh.warningFlash * 0.15) * 0.5;
-
+  const chaserY = pp.y + 130;
+  const s = pp.s * 0.5 * (0.85 + closeness * 0.3);
+  const alpha = 0.35 + closeness * 0.65;
+  const imgW = 180 * s, imgH = 180 * s;
+  // 摇晃动画
+  const sway = Math.sin(pharaoh.animT * 2) * 0.06;
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.translate(chaserX, chaserY);
-  ctx.globalAlpha = alpha;
-
-  const bob = Math.sin(t * 1.3) * 3 * s;
-  const legSwing = Math.sin(t * 1.4) * 5 * s;
-  const wingFlap = Math.sin(t * 2.2) * 0.25;
-
-  // 地面阴影
-  ctx.globalAlpha = alpha * 0.4;
-  ctx.fillStyle = 'rgba(0,0,0,0.9)';
-  ctx.beginPath(); ctx.ellipse(0, 12*s, 22*s, 5*s, 0, 0, Math.PI*2); ctx.fill();
-  ctx.globalAlpha = alpha;
-
-  ctx.translate(0, bob);
-
-  // 双腿
-  [-7, 7].forEach((lx, li) => {
-    const swing = li === 0 ? legSwing : -legSwing;
-    ctx.save(); ctx.translate(lx*s, -5*s); ctx.rotate(swing * 0.05);
-    ctx.fillStyle = '#ff8800';
-    ctx.beginPath(); ctx.roundRect(-3*s, 0, 6*s, 14*s, 2*s); ctx.fill();
-    ctx.fillStyle = '#ff6600';
-    ctx.beginPath(); ctx.ellipse(0, 14*s, 6*s, 3*s, 0, 0, Math.PI*2); ctx.fill();
-    [-2,0,2].forEach(cx=>{
-      ctx.strokeStyle='#cc4400'; ctx.lineWidth=0.7*s;
-      ctx.beginPath(); ctx.moveTo(cx*s, 12*s); ctx.lineTo((cx+0.8)*s, 17*s); ctx.stroke();
-    });
-    ctx.restore();
-  });
-
-  // 破烂披风（背后剧烈飘动，sin波形多段摆动）
-  const capeFlow = Math.sin(pharaoh.robeFlow) * 5 * s;
-  const capeFlow2 = Math.sin(pharaoh.robeFlow * 1.7 + 0.8) * 3 * s;
-  const capeSway = Math.sin(pharaoh.robeFlow * 2.3) * 2 * s;
-  ctx.fillStyle = '#0d0d0d';
-  ctx.beginPath();
-  ctx.moveTo(-18*s, -40*s);
-  ctx.quadraticCurveTo(-28*s + capeFlow, -10*s, -22*s + capeFlow, 12*s);
-  for(let zi=0; zi<5; zi++){
-    const zx = -22*s + capeFlow + zi*4.4*s;
-    ctx.lineTo(zx + 2.2*s, 15*s);
-    ctx.lineTo(zx + 4.4*s, 8*s);
+  ctx.rotate(sway);
+  // 红色危险光晕
+  if(closeness > 0.5){
+    const glowA = (closeness - 0.5) * 0.5;
+    const gl = ctx.createRadialGradient(0, -imgH*0.3, 0, 0, -imgH*0.3, imgW*0.8);
+    gl.addColorStop(0, `rgba(255,0,0,${glowA*0.4})`);
+    gl.addColorStop(1, 'transparent');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(0, -imgH*0.3, imgW*0.8, 0, Math.PI*2); ctx.fill();
   }
-  ctx.lineTo(22*s - capeFlow, 12*s);
-  ctx.quadraticCurveTo(28*s - capeFlow, -10*s, 18*s, -40*s);
-  ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(180,140,20,0.55)'; ctx.lineWidth = 1.5*s;
-  ctx.beginPath(); ctx.moveTo(-18*s,-40*s); ctx.quadraticCurveTo(-28*s+capeFlow,-10*s,-22*s+capeFlow,12*s); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(18*s,-40*s); ctx.quadraticCurveTo(28*s-capeFlow,-10*s,22*s-capeFlow,12*s); ctx.stroke();
-
-  // 身体（黑色椭圆）
-  const bodyG = ctx.createLinearGradient(-18*s, -40*s, 18*s, 8*s);
-  bodyG.addColorStop(0, '#252525'); bodyG.addColorStop(0.5, '#111111'); bodyG.addColorStop(1, '#050505');
-  ctx.fillStyle = bodyG;
-  ctx.beginPath(); ctx.ellipse(0, -20*s, 18*s, 26*s, 0, 0, Math.PI*2); ctx.fill();
-
-  // 白色腹部
-  const bellyG = ctx.createLinearGradient(0, -35*s, 0, 5*s);
-  bellyG.addColorStop(0, '#f5f0e8'); bellyG.addColorStop(0.6, '#e8e0d0'); bellyG.addColorStop(1, '#d0c8b8');
-  ctx.fillStyle = bellyG;
-  ctx.beginPath(); ctx.ellipse(0, -18*s, 10*s, 18*s, 0, 0, Math.PI*2); ctx.fill();
-
-  // 翅膀（煽动）
-  [-1, 1].forEach(side => {
-    ctx.save();
-    ctx.translate(side * 18*s, -20*s);
-    ctx.rotate(side * (Math.PI * 0.15 + wingFlap));
-    ctx.fillStyle = '#151515';
-    ctx.beginPath(); ctx.ellipse(0, 0, 7*s, 16*s, side * 0.3, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(80,60,30,0.3)';
-    ctx.beginPath(); ctx.ellipse(-1*s*side, -3*s, 3*s, 8*s, side * 0.2, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  });
-
-  // 头部
-  ctx.fillStyle = '#151515';
-  ctx.beginPath(); ctx.arc(0, -48*s, 18*s, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#ede8df';
-  ctx.beginPath(); ctx.ellipse(0, -44*s, 11*s, 13*s, 0, 0, Math.PI*2); ctx.fill();
-
-  // 牛角（恶魔特征）
-  [-1, 1].forEach(side => {
-    const hornG = ctx.createLinearGradient(side*8*s, -58*s, side*12*s, -74*s);
-    hornG.addColorStop(0, '#1a1a1a'); hornG.addColorStop(1, '#333333');
-    ctx.fillStyle = hornG;
-    ctx.beginPath();
-    ctx.moveTo(side * 7*s, -58*s);
-    ctx.quadraticCurveTo(side * 14*s, -62*s, side * 11*s, -75*s);
-    ctx.quadraticCurveTo(side * 9*s, -68*s, side * 5*s, -60*s);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(80,60,20,0.5)'; ctx.lineWidth = 0.8*s;
-    ctx.beginPath(); ctx.moveTo(side*7*s, -59*s); ctx.lineTo(side*11*s, -74*s); ctx.stroke();
-  });
-
-  // 恶魔眼睛（橙红发光）
-  [[-7, -49], [7, -49]].forEach(([ex, ey]) => {
-    ctx.save();
-    ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 8*s;
-    ctx.fillStyle = '#ff6600';
-    ctx.beginPath(); ctx.ellipse(ex*s, ey*s, 4.5*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#cc2200';
-    ctx.beginPath(); ctx.ellipse(ex*s, ey*s, 2*s, 3.5*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#ffaa44';
-    ctx.beginPath(); ctx.arc(ex*s - 1*s, ey*s - 1.5*s, 1.2*s, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  });
-
-  // V形凶眉
-  ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 2*s; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(-11*s, -54*s); ctx.lineTo(-6*s, -52*s); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(11*s, -54*s); ctx.lineTo(6*s, -52*s); ctx.stroke();
-
-  // 橙色喙 + 尖牙
-  ctx.fillStyle = '#ff8800';
-  ctx.beginPath(); ctx.moveTo(-5*s, -40*s); ctx.lineTo(5*s, -40*s); ctx.lineTo(0, -34*s); ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.moveTo(-3*s,-40*s); ctx.lineTo(-2*s,-40*s); ctx.lineTo(-2.5*s,-44*s); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(2*s,-40*s); ctx.lineTo(3*s,-40*s); ctx.lineTo(2.5*s,-44*s); ctx.fill();
-
-  // 红色学士帽
-  const hatBrim = ctx.createLinearGradient(-22*s,-64*s,22*s,-61*s);
-  hatBrim.addColorStop(0,'#8a0000'); hatBrim.addColorStop(0.5,'#cc0000'); hatBrim.addColorStop(1,'#8a0000');
-  ctx.fillStyle = hatBrim;
-  ctx.beginPath(); ctx.ellipse(0, -64*s, 22*s, 5*s, 0, 0, Math.PI*2); ctx.fill();
-  const hatBodyG = ctx.createLinearGradient(-14*s,-83*s,14*s,-64*s);
-  hatBodyG.addColorStop(0,'#cc0000'); hatBodyG.addColorStop(0.5,'#aa0000'); hatBodyG.addColorStop(1,'#880000');
-  ctx.fillStyle = hatBodyG;
-  ctx.beginPath(); ctx.roundRect(-14*s,-83*s,28*s,20*s,2*s); ctx.fill();
-  ctx.strokeStyle='rgba(255,200,0,0.6)'; ctx.lineWidth=0.8*s;
-  ctx.beginPath(); ctx.roundRect(-14*s,-83*s,28*s,20*s,2*s); ctx.stroke();
-  // 流苏
-  ctx.strokeStyle='#ffdd00'; ctx.lineWidth=1.5*s;
-  ctx.beginPath(); ctx.moveTo(0,-83*s); ctx.lineTo(12*s,-79*s); ctx.stroke();
-  ctx.fillStyle='#ffdd00';
-  ctx.beginPath(); ctx.arc(12*s,-79*s,3*s,0,Math.PI*2); ctx.fill();
-
-  // 三叉戟（左手持）
-  ctx.save();
-  ctx.translate(-24*s, -28*s);
-  ctx.rotate(-0.25 + Math.sin(t*0.8)*0.08);
-  const staffG = ctx.createLinearGradient(-1.5*s,0,1.5*s,40*s);
-  staffG.addColorStop(0,'#999999'); staffG.addColorStop(1,'#444444');
-  ctx.fillStyle=staffG; ctx.fillRect(-1.5*s,-50*s,3*s,56*s);
-  ctx.fillStyle='#bbbbbb';
-  [-6,0,6].forEach(fx=>{
-    ctx.beginPath(); ctx.moveTo(fx*s-2*s,-50*s); ctx.lineTo(fx*s+2*s,-50*s); ctx.lineTo(fx*s,-63*s); ctx.fill();
-  });
-  ctx.strokeStyle='rgba(220,220,220,0.5)'; ctx.lineWidth=0.8*s;
-  ctx.beginPath(); ctx.moveTo(-0.5*s,-50*s); ctx.lineTo(-0.5*s,5*s); ctx.stroke();
-  ctx.restore();
-
-  // 危险特效
-  if(danger > 0) {
-    ctx.save();
-    ctx.globalAlpha = alpha * danger * pulse * 0.4;
-    const dg = ctx.createRadialGradient(0,-30*s,0,0,-30*s,55*s);
-    dg.addColorStop(0,'rgba(255,50,0,0.6)'); dg.addColorStop(1,'transparent');
-    ctx.fillStyle=dg; ctx.beginPath(); ctx.arc(0,-30*s,55*s,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-    if(danger > 0.75) {
-      ctx.globalAlpha = alpha * (danger-0.75)*4 * pulse;
-      ctx.fillStyle='#ff2200'; ctx.font=`bold ${9*s|0}px Arial`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.shadowColor='#ff0000'; ctx.shadowBlur=8*s;
-      ctx.fillText('危险！', 0, -100*s);
-      ctx.shadowBlur=0; ctx.globalAlpha=alpha;
-    }
+  if(IMG.pharaoh.complete && IMG.pharaoh.naturalWidth > 0){
+    ctx.drawImage(IMG.pharaoh, -imgW/2, -imgH, imgW, imgH);
   }
-
   ctx.restore();
 }
 
@@ -2245,33 +2091,17 @@ function drawPharaoh() {
 function drawPenguin(){
   const p=proj(P.x,P.y,P.z); if(!p) return;
   const px=p.x, py=p.y, s=p.s*.55;
+  const isl = P.slide;
+  const imgW = 120*s, imgH = 120*s;
+  // 跑步摇摆
+  const bounce = Math.sin(P.rc*2)*3*s;
+  const lean = Math.sin(P.rc)*0.1;
 
-  // ── 滑行残影（3帧半透明叠影）──────────────────────────────
-  if(P.slide){
-    for(let gi=1;gi<=3;gi++){
-      const gz = P.z + gi * Math.max(4, speed * 0.9);
-      const gp = proj(P.x, P.y, gz); if(!gp) continue;
-      const gs = gp.s * 0.55;
-      ctx.save();
-      ctx.globalAlpha = (0.28 - gi*0.07);
-      ctx.translate(gp.x, gp.y);
-      ctx.rotate(-0.5); ctx.scale(1, 0.65);
-      // 身体轮廓残影
-      const gg=ctx.createRadialGradient(0,-12*gs,2*gs,0,-10*gs,20*gs);
-      gg.addColorStop(0,'rgba(80,120,220,0.7)');
-      gg.addColorStop(1,'transparent');
-      ctx.fillStyle=gg;
-      ctx.beginPath(); ctx.ellipse(0,-12*gs,18*gs,22*gs,0,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
-  }
+  ctx.save(); ctx.translate(px, py+bounce);
 
-  ctx.save(); ctx.translate(px,py);
-
-  // ── 护盾光晕 ──────────────────────────────────────────────
+  // 护盾光晕
   if(hasShield){
     ctx.save();
-    // 外层护符旋转纹样
     ctx.globalAlpha=0.18+Math.sin(frame*.08)*.08;
     for(let ri=0;ri<6;ri++){
       const ra=ri*Math.PI/3+frame*.018;
@@ -2279,315 +2109,33 @@ function drawPenguin(){
       ctx.fillStyle='#ffd700';
       ctx.beginPath(); ctx.arc(rx,ry-12*s,2.5*s,0,Math.PI*2); ctx.fill();
     }
-    ctx.globalAlpha=.28+Math.sin(frame*.1)*.12;
-    const sg=ctx.createRadialGradient(0,-12*s,5*s,0,-12*s,34*s);
-    sg.addColorStop(0,'transparent'); sg.addColorStop(.65,'rgba(255,215,0,0.5)'); sg.addColorStop(1,'transparent');
-    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(0,-12*s,34*s,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle='rgba(255,215,0,0.7)'; ctx.lineWidth=2*s;
-    ctx.setLineDash([5*s,4*s]); ctx.lineDashOffset=frame*.8;
-    ctx.globalAlpha=.6+Math.sin(frame*.15)*.28;
-    ctx.beginPath(); ctx.arc(0,-12*s,32*s,0,Math.PI*2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-  if(hasMag){
-    ctx.save(); ctx.globalAlpha=.12+Math.sin(frame*.08)*.04;
-    const mg=ctx.createRadialGradient(0,-12*s,5*s,0,-12*s,52*s);
-    mg.addColorStop(0,'transparent'); mg.addColorStop(.7,'#ffaa44'); mg.addColorStop(1,'transparent');
-    ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(0,-12*s,52*s,0,Math.PI*2); ctx.fill();
-    // 磁场弧线
     ctx.globalAlpha=0.22+Math.sin(frame*.06)*.1;
-    ctx.strokeStyle='#ff8822'; ctx.lineWidth=s*0.9;
-    for(let mi=0;mi<3;mi++){
-      const ma=frame*.04+mi*Math.PI*2/3;
-      ctx.beginPath(); ctx.arc(0,-12*s,38*s,ma,ma+1.2); ctx.stroke();
-    }
+    ctx.strokeStyle='rgba(100,200,255,0.7)';
+    ctx.lineWidth=2.5*s;
+    ctx.beginPath(); ctx.arc(0,-20*s,32*s,0,Math.PI*2); ctx.stroke();
     ctx.restore();
   }
 
-  // 地面阴影（动态：跳跃时投影拉伸变淡，落地压缩变实）
-  const jumpH = Math.max(0, P.y);
-  const shadowSz = Math.max(0.35, 1 - jumpH*0.016);
-  const shadowA  = Math.max(0.06, 0.38 - jumpH*0.007);
-  ctx.fillStyle=`rgba(0,0,0,${shadowA.toFixed(3)})`;
-  ctx.beginPath(); ctx.ellipse(jumpH*0.07*s, 2+jumpH*0.10*s, 20*s*shadowSz, 6*s*P.sq*shadowSz, 0,0,Math.PI*2); ctx.fill();
-  // 跳跃时在地面额外投射一个真实落地阴影
-  if(jumpH > 6){
-    const gsp = proj(P.x, 0, P.z);
-    if(gsp){
-      ctx.save();
-      ctx.translate(gsp.x-px, gsp.y-py);
-      ctx.globalAlpha = Math.max(0.04, 0.24-jumpH*0.005);
-      ctx.fillStyle = 'rgba(0,0,0,0.88)';
-      ctx.beginPath(); ctx.ellipse(0,0, 15*gsp.s*shadowSz, 3.5*gsp.s*shadowSz, 0,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
+  ctx.rotate(lean);
+  if(isl) ctx.rotate(-0.45);
+  ctx.scale(isl?1:1, isl?0.65:P.sq);
+
+  if(IMG.penguin.complete && IMG.penguin.naturalWidth > 0){
+    ctx.drawImage(IMG.penguin, -imgW/2, -imgH, imgW, imgH);
   }
 
-  const isl=P.slide;
-  // 跳跃拉伸/落地压扁
-  const stretchV = P.jump && P.vy > 2 ? P.st : 1;
-  const squashH  = P.jump && P.vy > 2 ? 0.88 : 1;
-  ctx.save(); ctx.rotate(isl?-.5:0);
-  ctx.scale(squashH, P.sq*stretchV*(isl?.65:1));
-
-  // ── 靴子/腿 ──────────────────────────────────────────────
-  if(!isl){
-    // 高速时腿部运动残影
-    if(sm > 1.8){
-      const ghostAlpha = Math.min(0.28, (sm-1.8)*0.15);
-      ctx.save(); ctx.globalAlpha = ghostAlpha;
-      [[-6,1],[6,-1]].forEach(([off,fl])=>{
-        const prevRC = P.rc - 0.35;
-        const prevLeg = Math.sin(prevRC)*25;
-        ctx.save(); ctx.translate(off*s,0);
-        ctx.rotate(prevLeg*fl*Math.min(38,25+sm*5)*Math.PI/180/25);
-        ctx.fillStyle='#3a5090';
-        ctx.beginPath(); ctx.roundRect(-3.5*s,-5*s,7*s,8*s,1.5*s); ctx.fill();
-        ctx.restore();
-      });
-      ctx.restore();
-    }
-    [[-6,1],[6,-1]].forEach(([off,fl])=>{
-      ctx.save(); ctx.translate(off*s,0);
-      const legAmp = Math.min(38, 25 + sm * 5); // 步频随速度变化
-      ctx.rotate(P.leg*fl*legAmp*Math.PI/180/25);
-      // 裤管（深蓝探险裤）
-      ctx.fillStyle='#1a2a5a';
-      ctx.beginPath(); ctx.roundRect(-3.5*s,-5*s,7*s,8*s,1.5*s); ctx.fill();
-      // 裤管缝线
-      ctx.strokeStyle='rgba(80,110,200,0.4)'; ctx.lineWidth=0.6*s;
-      ctx.beginPath(); ctx.moveTo(0,-5*s); ctx.lineTo(0,3*s); ctx.stroke();
-      // 靴筒
-      const bootG=ctx.createLinearGradient(-4*s,0,4*s,12*s);
-      bootG.addColorStop(0,'#7a4218'); bootG.addColorStop(0.4,'#5a2e10'); bootG.addColorStop(1,'#3a1a08');
-      ctx.fillStyle=bootG;
-      ctx.beginPath(); ctx.roundRect(-4*s,2*s,8*s,10*s,2*s); ctx.fill();
-      // 靴筒高光
-      ctx.fillStyle='rgba(200,130,60,0.2)';
-      ctx.beginPath(); ctx.roundRect(-3*s,3*s,2.5*s,4*s,1*s); ctx.fill();
-      // 靴底
-      const soleG=ctx.createLinearGradient(-7*s,11*s,7*s,13*s);
-      soleG.addColorStop(0,'#1a0a03'); soleG.addColorStop(0.5,'#2e1508'); soleG.addColorStop(1,'#1a0a03');
-      ctx.fillStyle=soleG;
-      ctx.beginPath(); ctx.ellipse(-fl*1.5*s,12*s,7.5*s,3.8*s,.25*fl,0,Math.PI*2); ctx.fill();
-      // 靴底纹防滑纹
-      ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=0.5*s;
-      for(let bi=0;bi<3;bi++){
-        ctx.beginPath(); ctx.moveTo((-4+bi*2.5)*s,12.5*s); ctx.lineTo((-3+bi*2.5)*s,13.5*s); ctx.stroke();
-      }
-      // 靴扣（金色腾讯Logo色）
-      const buckG=ctx.createRadialGradient(0*s,5*s,0.5*s,0*s,5*s,2.5*s);
-      buckG.addColorStop(0,'#ffe050'); buckG.addColorStop(1,'#a06a08');
-      ctx.fillStyle=buckG;
-      ctx.beginPath(); ctx.arc(0*s,5*s,2*s,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle='rgba(80,50,5,0.5)'; ctx.lineWidth=0.5*s;
-      ctx.beginPath(); ctx.arc(0*s,5*s,2*s,0,Math.PI*2); ctx.stroke();
-      ctx.restore();
-    });
-  } else {
-    // 滑行靴（侧躺）
-    const sb=ctx.createLinearGradient(-18*s,8*s,18*s,14*s);
-    sb.addColorStop(0,'#3a1a08'); sb.addColorStop(0.5,'#6a3a18'); sb.addColorStop(1,'#3a1a08');
-    ctx.fillStyle=sb;
-    ctx.beginPath(); ctx.ellipse(0,10*s,18*s,4.5*s,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(200,130,60,0.2)';
-    ctx.beginPath(); ctx.ellipse(-6*s,9*s,5*s,2*s,0,0,Math.PI*2); ctx.fill();
-  }
-
-  // ── 腰包（探险家装备）─────────────────────────────────────
-  if(!isl){
-    const bpG=ctx.createLinearGradient(-8*s,-5*s,8*s,2*s);
-    bpG.addColorStop(0,'#5a3010'); bpG.addColorStop(0.5,'#7a4820'); bpG.addColorStop(1,'#3a2008');
-    ctx.fillStyle=bpG;
-    ctx.beginPath(); ctx.roundRect(9*s,-8*s,11*s,9*s,2*s); ctx.fill();
-    // 腰包金扣
-    ctx.fillStyle='#c8960a'; ctx.fillRect(12*s,-5*s,5*s,1.5*s);
-    // 腰包口袋
-    ctx.fillStyle='rgba(40,20,8,0.5)'; ctx.beginPath(); ctx.roundRect(10.5*s,-6.5*s,4*s,4*s,1*s); ctx.fill();
-    // 腰包带
-    ctx.strokeStyle='#4a2808'; ctx.lineWidth=2.5*s;
-    ctx.beginPath(); ctx.moveTo(9*s,-4*s); ctx.lineTo(-18*s,-4*s); ctx.stroke();
-    ctx.strokeStyle='#6a3818'; ctx.lineWidth=1.5*s;
-    ctx.beginPath(); ctx.moveTo(9*s,-4*s); ctx.lineTo(-18*s,-4*s); ctx.stroke();
-  }
-
-  // ── 企鹅身体（腾讯吉祥物：黑色外套+白肚皮边可见）────────
-  // 白肚皮（侧边可见弧线）
-  ctx.fillStyle='rgba(240,240,240,0.18)';
-  ctx.beginPath(); ctx.ellipse(0,-10*s,10*s,16*s,0,0,Math.PI*2); ctx.fill();
-
-  // 主体（深黑羽毛）
-  const bg=ctx.createRadialGradient(-6*s,-18*s,3,2*s,-8*s,26*s);
-  bg.addColorStop(0,'#383838'); bg.addColorStop(0.4,'#1c1c1c'); bg.addColorStop(0.8,'#0e0e0e'); bg.addColorStop(1,'#060606');
-  ctx.fillStyle=bg; ctx.beginPath(); ctx.ellipse(0,-12*s,18*s,22*s,0,0,Math.PI*2); ctx.fill();
-
-  // 背部羽毛纹理（细化分层）
-  const backG=ctx.createRadialGradient(3*s,-18*s,2,0,-10*s,18*s);
-  backG.addColorStop(0,'#323232'); backG.addColorStop(0.5,'#1a1a1a'); backG.addColorStop(1,'#080808');
-  ctx.fillStyle=backG; ctx.beginPath(); ctx.ellipse(0,-10*s,11*s,15*s,0,0,Math.PI*2); ctx.fill();
-
-  // 羽毛细纹（蓬松感）
-  ctx.strokeStyle='rgba(70,70,70,0.55)'; ctx.lineWidth=0.7*s;
-  [-6,-2,2,6].forEach((dx,i)=>{
-    ctx.beginPath(); ctx.moveTo(dx*s,-3*s); ctx.quadraticCurveTo((dx+2.5)*s,-11*s,(dx+0.5)*s,-19*s); ctx.stroke();
-  });
-  // 羽毛高光（蓝紫虹彩）
-  ctx.save(); ctx.globalAlpha=0.12+Math.sin(frame*.04+1)*0.05;
-  const iridG=ctx.createLinearGradient(-10*s,-22*s,10*s,-5*s);
-  iridG.addColorStop(0,'rgba(80,80,200,0.8)'); iridG.addColorStop(0.5,'rgba(120,60,180,0.4)'); iridG.addColorStop(1,'transparent');
-  ctx.fillStyle=iridG; ctx.beginPath(); ctx.ellipse(0,-13*s,10*s,13*s,0,0,Math.PI*2); ctx.fill();
-  ctx.restore();
-
-  // ── 翅膀（带探险家背包带，扇动幅度随速度增强）──────────────────
-  [[-16,-1],[16,1]].forEach(([tx,fl])=>{
-    ctx.save(); ctx.translate(tx*s,-12*s);
-    const wingAmp = 1 + Math.min(1, (sm-1)*0.5); // 速度越快扇动越猛
-    ctx.rotate((-20*fl+P.wing*fl*wingAmp*1.8)*Math.PI/180);
-    const wg=ctx.createLinearGradient(-5*s,-4*s,5*s,18*s);
-    wg.addColorStop(0,'#2e2e2e'); wg.addColorStop(0.5,'#1a1a1a'); wg.addColorStop(1,'#080808');
-    ctx.fillStyle=wg; ctx.beginPath(); ctx.ellipse(fl*3*s,8*s,6.5*s,15*s,.18*fl,0,Math.PI*2); ctx.fill();
-    // 翅膀前缘高光
-    ctx.fillStyle='rgba(60,60,60,0.4)';
-    ctx.beginPath(); ctx.ellipse(fl*1*s,5*s,2.5*s,7*s,.18*fl,0,Math.PI*2); ctx.fill();
-    // 袖口（卡其色探险家外套）
-    const cuffG=ctx.createLinearGradient(fl*-1*s,14*s,fl*5*s,18*s);
-    cuffG.addColorStop(0,'#b89040'); cuffG.addColorStop(0.5,'#9a7a30'); cuffG.addColorStop(1,'#6a5018');
-    ctx.fillStyle=cuffG;
-    ctx.beginPath(); ctx.ellipse(fl*3*s,17*s,6*s,3.2*s,0,0,Math.PI*2); ctx.fill();
-    // 袖口金线
-    ctx.strokeStyle='rgba(200,160,40,0.6)'; ctx.lineWidth=0.8*s;
-    ctx.beginPath(); ctx.ellipse(fl*3*s,16*s,5.5*s,2.5*s,0,0,Math.PI*2); ctx.stroke();
-    ctx.restore();
-  });
-
-  // ── 背包（神庙探险风格）──────────────────────────────────
-  if(!isl){
-    const pkG=ctx.createLinearGradient(-8*s,-32*s,8*s,-8*s);
-    pkG.addColorStop(0,'#5a3c18'); pkG.addColorStop(0.3,'#7a5428'); pkG.addColorStop(0.7,'#6a4420'); pkG.addColorStop(1,'#3a2008');
-    ctx.fillStyle=pkG;
-    ctx.beginPath(); ctx.roundRect(-7*s,-32*s,14*s,20*s,3*s); ctx.fill();
-    // 背包边框
-    ctx.strokeStyle='rgba(180,130,50,0.5)'; ctx.lineWidth=0.8*s;
-    ctx.beginPath(); ctx.roundRect(-7*s,-32*s,14*s,20*s,3*s); ctx.stroke();
-    // 背包口袋扣
-    const buckG2=ctx.createLinearGradient(-3*s,-20*s,3*s,-16*s);
-    buckG2.addColorStop(0,'#ffd050'); buckG2.addColorStop(1,'#a07010');
-    ctx.fillStyle=buckG2; ctx.beginPath(); ctx.roundRect(-3*s,-20*s,6*s,4*s,1*s); ctx.fill();
-    // 背包安卡符号刺绣
-    ctx.save(); ctx.globalAlpha=0.38;
-    ctx.strokeStyle='#ffd700'; ctx.lineWidth=0.8*s;
-    ctx.beginPath(); ctx.arc(0,-26*s,2.5*s,0,Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,-23.5*s); ctx.lineTo(0,-18*s); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-3*s,-22*s); ctx.lineTo(3*s,-22*s); ctx.stroke();
-    ctx.restore();
-  }
-
-  // ── 头部（精细化：腾讯企鹅后脑勺+帽子）─────────────────────
-  const hy=-30*s;
-  // 头部底色（略带蓝光，腾讯企鹅）
-  const hg=ctx.createRadialGradient(-4*s,hy-6*s,2,1*s,hy,14*s);
-  hg.addColorStop(0,'#303038'); hg.addColorStop(0.6,'#1a1a22'); hg.addColorStop(1,'#0a0a10');
-  ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(0,hy,14*s,0,Math.PI*2); ctx.fill();
-  // 头部高光（圆形光泽）
-  ctx.fillStyle='rgba(80,80,120,0.15)';
-  ctx.beginPath(); ctx.arc(-4*s,hy-6*s,5*s,0,Math.PI*2); ctx.fill();
-  // 耳朵（小圆耳）
-  [-1,1].forEach(fl=>{
-    ctx.fillStyle='#1a1a22';
-    ctx.beginPath(); ctx.arc(fl*13*s,hy-4*s,3.5*s,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(30,30,50,0.5)';
-    ctx.beginPath(); ctx.arc(fl*12.5*s,hy-4.5*s,2*s,0,Math.PI*2); ctx.fill();
-  });
-
-  // ── 探险家帽子（精细化）──────────────────────────────────
-  // 帽檐阴影（前面投影）
-  ctx.fillStyle='rgba(0,0,0,0.3)';
-  ctx.beginPath(); ctx.ellipse(2*s,hy-12*s,22*s,7*s,0.08,0,Math.PI*2); ctx.fill();
-  // 帽檐主体
-  const brimG=ctx.createLinearGradient(-22*s,hy-18*s,22*s,hy-10*s);
-  brimG.addColorStop(0,'#4a2808'); brimG.addColorStop(0.3,'#7a5020'); brimG.addColorStop(0.5,'#6a4018'); brimG.addColorStop(0.8,'#5a3010'); brimG.addColorStop(1,'#3a1808');
-  ctx.fillStyle=brimG;
-  ctx.beginPath(); ctx.ellipse(0,hy-13*s,21*s,5.5*s,0,0,Math.PI*2); ctx.fill();
-  // 帽檐皮革纹理
-  ctx.strokeStyle='rgba(30,15,5,0.3)'; ctx.lineWidth=0.6*s;
-  for(let ci=0;ci<5;ci++){
-    ctx.beginPath(); ctx.ellipse(0,hy-13*s,(21-ci*3)*s,(5.5-ci*.5)*s,0,0.1,0.9*Math.PI); ctx.stroke();
-  }
-  // 帽身渐变
-  const hatG=ctx.createLinearGradient(-14*s,hy-32*s,14*s,hy-12*s);
-  hatG.addColorStop(0,'#9a5c2a'); hatG.addColorStop(0.25,'#7a4018'); hatG.addColorStop(0.6,'#5e3010'); hatG.addColorStop(1,'#3a1a08');
-  ctx.fillStyle=hatG;
-  ctx.beginPath(); ctx.roundRect(-13*s,hy-31*s,26*s,18*s,3*s); ctx.fill();
-  // 帽身侧面阴影
-  ctx.fillStyle='rgba(0,0,0,0.22)';
-  ctx.beginPath(); ctx.roundRect(7*s,hy-30*s,6*s,17*s,2*s); ctx.fill();
-  // 帽身皮纹横缝
-  ctx.strokeStyle='rgba(30,15,5,0.25)'; ctx.lineWidth=0.7*s;
-  for(let hi=0;hi<4;hi++){
-    ctx.beginPath(); ctx.moveTo(-12*s,hy-28*s+hi*5*s); ctx.lineTo(12*s,hy-28*s+hi*5*s); ctx.stroke();
-  }
-  // 帽带（黑色皮革）
-  const hatbG=ctx.createLinearGradient(-13*s,hy-17*s,13*s,hy-14*s);
-  hatbG.addColorStop(0,'#0e0805'); hatbG.addColorStop(0.5,'#1e1008'); hatbG.addColorStop(1,'#0e0805');
-  ctx.fillStyle=hatbG;
-  ctx.fillRect(-13*s,hy-17.5*s,26*s,4*s);
-  // 帽带缝线
-  ctx.strokeStyle='rgba(150,100,30,0.4)'; ctx.lineWidth=0.5*s;
-  ctx.setLineDash([2*s,2*s]);
-  ctx.beginPath(); ctx.moveTo(-12*s,hy-16*s); ctx.lineTo(12*s,hy-16*s); ctx.stroke();
-  ctx.setLineDash([]);
-  // 帽带扣（金色精细）
-  const bckG=ctx.createLinearGradient(-4*s,hy-19*s,4*s,hy-14*s);
-  bckG.addColorStop(0,'#ffe050'); bckG.addColorStop(0.5,'#c89020'); bckG.addColorStop(1,'#806010');
-  ctx.fillStyle=bckG;
-  ctx.beginPath(); ctx.roundRect(-4.5*s,hy-19.5*s,9*s,6*s,1.5*s); ctx.fill();
-  ctx.fillStyle='rgba(0,0,0,0.5)';
-  ctx.beginPath(); ctx.roundRect(-2.5*s,hy-18*s,5*s,3*s,0.8*s); ctx.fill();
-  // 帽顶金属钉
-  ctx.fillStyle='#c8a020'; ctx.beginPath(); ctx.arc(0,hy-31*s,2.5*s,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='rgba(255,220,80,0.6)'; ctx.beginPath(); ctx.arc(-0.8*s,hy-32*s,1*s,0,Math.PI*2); ctx.fill();
-
-  // 速度特效（下落时产生飘动气流线）
-  if(P.jump && P.vy < -1 && !isl){
-    const fallSpeed = Math.min(1, Math.abs(P.vy)/8);
+  // 磁铁特效
+  if(hasMag){
     ctx.save();
-    ctx.strokeStyle = `rgba(220,180,100,0.6)`;
-    ctx.lineWidth = 1.2;
-    [-18,-7,5,16].forEach((off,i)=>{
-      const len = (18+i*8)*s*fallSpeed;
-      ctx.globalAlpha = 0.2*fallSpeed*(1-i*.22);
-      ctx.beginPath();
-      ctx.moveTo(off*s, (-28+i*8)*s);
-      ctx.lineTo(off*s - len, (-28+i*8)*s);
-      ctx.stroke();
-    });
+    ctx.globalAlpha=0.5+Math.sin(frame*.1)*.3;
+    ctx.fillStyle='#ff88ff';
+    ctx.font=`${14*s}px Arial`;
+    ctx.textAlign='center';
+    ctx.fillText('🧲', 0, -imgH-8*s);
     ctx.restore();
   }
 
-  // ── 速度特效 ─────────────────────────────────────────────
-  if(scoreMult>1){
-    for(let i=0;i<6;i++){
-      ctx.save();
-      ctx.globalAlpha=(.42-i*.07)*(0.55+Math.sin(frame*.1+i)*.35);
-      ctx.fillStyle=`hsl(${20+i*10},100%,${58-i*4}%)`;
-      const ts=1-i*.16;
-      ctx.beginPath(); ctx.ellipse(-i*3.5*s,-12*s,18*s*ts,22*s*ts,0,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
-  }
-  if(sm>1.5&&!isl){
-    const flowA=Math.min(.5,(sm-1.5)*.3);
-    ctx.strokeStyle=`rgba(220,150,40,${flowA})`;
-    ctx.lineWidth=1.8;
-    [-16,-6,4].forEach((off,i)=>{
-      const len=(22+i*9)*s*(0.7+Math.sin(frame*.08+i)*.3);
-      ctx.globalAlpha=flowA*(1-i*.25);
-      ctx.beginPath(); ctx.moveTo(-26*s,(-32+off)*s); ctx.lineTo(-26*s-len,(-32+off)*s); ctx.stroke();
-    });
-    ctx.globalAlpha=1;
-  }
-  ctx.restore(); ctx.restore();
+  ctx.restore();
 }
 
 // ── DRAW HUD (神庙风格UI) ─────────────────────────────────────
