@@ -833,15 +833,36 @@ document.addEventListener('keydown', e => {
 canvas.addEventListener('touchstart', e => {
   tx = e.touches[0].clientX;
   ty = e.touches[0].clientY;
+  // 同步更新 mouseX/mouseY 用于按钮悬停检测
+  const rect = canvas.getBoundingClientRect();
+  mouseX = (tx - rect.left) * (BW / rect.width);
+  mouseY = (ty - rect.top)  * (BH / rect.height);
   e.preventDefault();
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - tx;
-  const dy = e.changedTouches[0].clientY - ty;
-  const ax = Math.abs(dx);
-  const ay = Math.abs(dy);
-  if (ax < 10 && ay < 10) { act('x'); return; }
+  const touch = e.changedTouches[0];
+  const rect  = canvas.getBoundingClientRect();
+  const cx2   = (touch.clientX - rect.left) * (BW / rect.width);
+  const cy2   = (touch.clientY - rect.top)  * (BH / rect.height);
+  mouseX = cx2;
+  mouseY = cy2;
+
+  const dx = touch.clientX - tx;
+  const dy = touch.clientY - ty;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+
+  // 轻触（位移<15px）→ 触发按钮点击逻辑
+  if (ax < 15 && ay < 15) {
+    canvas.dispatchEvent(new MouseEvent('click', {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      bubbles: true
+    }));
+    return;
+  }
+
+  // 滑动 → 方向控制
   if (ax > ay) act(dx < 0 ? 'l' : 'r');
   else act(dy < 0 ? 'u' : 'd');
   e.preventDefault();
